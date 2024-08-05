@@ -1,4 +1,5 @@
-Server Medial Dynamic OG Image
+**Server Medial Dynamic OG Image
+**
 This is a server-side application built with Node.js, Express, and TypeScript that generates dynamic Open Graph (OG) images. The images are generated from HTML templates, compressed using sharp, and cached for performance optimization.
 
 Features
