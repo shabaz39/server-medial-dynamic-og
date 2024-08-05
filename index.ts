@@ -1,26 +1,34 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
-import nodeHtmlToImage from 'node-html-to-image';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import sharp from 'sharp';
-import dotenv from 'dotenv';
 import cors from 'cors';
+import { chromium } from 'playwright';
 
-dotenv.config(); 
+ 
+
+ 
 
 const app = express();
 const upload = multer();
 const cacheDir = path.join(__dirname, 'cache');
-app.use(cors());
-const backendURL = process.env.backend_URL
-
+app.use(
+  cors({
+    origin: ["http://localhost:3000", "https://client-medial-dynamic-og-image-33kongoinq-uc.a.run.app" ],
+    credentials: true,
+  })
+);
 
 // Ensure cache directory exists
 if (!fs.existsSync(cacheDir)) {
   fs.mkdirSync(cacheDir);
 }
+
+app.get('/', (req: Request, res: Response) => {
+  res.send('Server is running!');
+});
 
 app.post('/generate-og-image', upload.single('image'), async (req: Request, res: Response) => {
   try {
@@ -34,7 +42,7 @@ app.post('/generate-og-image', upload.single('image'), async (req: Request, res:
 
     // Check if image already exists in cache
     if (fs.existsSync(cachedImagePath)) {
-      return res.json({ ogImageUrl: `${backendURL}/cache/${hash}.jpg` });
+      return res.json({ ogImageUrl: `https://server-medial-repo-image-33kongoinq-uc.a.run.app/cache/${hash}.jpg` });
     }
 
     const imageHtml = image ? `<img src="data:image/jpeg;base64,${image.buffer.toString('base64')}" alt="Post Image" class="post-image" />` : '';
@@ -45,6 +53,9 @@ app.post('/generate-og-image', upload.single('image'), async (req: Request, res:
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta property="og:title" content="${title}" />
+      <meta property="og:description" content="${content.slice(0, 150)}" />
+      <meta property="og:image" content="${image ? `data:image/jpeg;base64,${image.buffer.toString('base64')}` : ''}" />
       <style>
         body {
           font-family: Arial, sans-serif;
@@ -136,13 +147,14 @@ app.post('/generate-og-image', upload.single('image'), async (req: Request, res:
     `;
 
    
+  // Generate the image using Playwright
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.setContent(htmlTemplate);
+  const imageBuffer = await page.screenshot({ type: 'jpeg', fullPage: true });
 
-    // Generate the image using nodeHtmlToImage
-    const imageBuffer = await nodeHtmlToImage({
-      html: htmlTemplate,
-      quality: 100,
-      type: 'jpeg',
-    }) as Buffer;
+  await browser.close();
+
 
     // Compress the image using sharp
     const compressedImage = await sharp(imageBuffer)
@@ -154,14 +166,17 @@ app.post('/generate-og-image', upload.single('image'), async (req: Request, res:
 
 
     // Respond with the cached image URL
-    res.json({ ogImageUrl: `${backendURL}/cache/${hash}.jpg` });
-  } catch (error) {
-    console.error('Error generating OG image:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.json({ ogImageUrl: `https://server-medial-repo-image-33kongoinq-uc.a.run.app/cache/${hash}.jpg`});
+
+    console.log({ ogImageUrl: `https://server-medial-repo-image-33kongoinq-uc.a.run.app/cache/${hash}.jpg` })
+
+  } catch (error:any) {
+    console.error('Error generating OG image:', error.message);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 });
 
 app.use('/cache', express.static(cacheDir));
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
